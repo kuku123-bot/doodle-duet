@@ -1,0 +1,14 @@
+{
+  "name": "doodle-duet",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "node tests/relay.test.mjs && node tools/e2e-touch.mjs && node tools/e2e.mjs chromium webkit",
+    "test:relay": "RELAY=1 node tools/e2e.mjs chromium webkit",
+    "icons": "node tools/icons.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

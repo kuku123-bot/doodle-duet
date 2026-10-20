@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "doodle-duet", "runtimeExecutable": "node", "runtimeArgs": ["tools/serve.mjs", "8377"], "port": 8377 }
+  ]
+}
