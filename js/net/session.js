@@ -5,7 +5,7 @@
 import { claimRoom, connectToHost } from './transport.js';
 import { RelayHost, connectRelay } from './relay.js';
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2; // 2: new brushes (an older page would draw them as the ink pen)
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // testing aid: skip the direct link and use the relay (only on this computer)
 const forceRelay = () => { try { return localStorage.getItem('dd.forcerelay') === '1' && ['localhost', '127.0.0.1'].includes(location.hostname); } catch (e) { return false; } };

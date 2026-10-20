@@ -3,6 +3,7 @@
 // While drawing, points are rendered and sent the moment the pointer event arrives: that is where the low latency comes from.
 import { clamp, q1, q2 } from './util.js';
 import { brushOf } from './brushes.js';
+import { recognize } from './shapes.js';
 
 const now = () => performance.now();
 
@@ -188,31 +189,27 @@ export class Input {
     a.holdT = setTimeout(() => { if (this.act === a) this.quickShape(a); }, 600);
   }
   quickShape(a) {
-    const P = a.pts, n = P.length / 3;
-    if (n < 6) return;
-    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity, len = 0, ps = 0;
-    for (let i = 0; i < P.length; i += 3) {
-      minx = Math.min(minx, P[i]); maxx = Math.max(maxx, P[i]); miny = Math.min(miny, P[i + 1]); maxy = Math.max(maxy, P[i + 1]); ps += P[i + 2];
-      if (i) len += Math.hypot(P[i] - P[i - 3], P[i + 1] - P[i - 2]);
-    }
-    const diag = Math.hypot(maxx - minx, maxy - miny);
-    if (len < 30 / this.app.view.s || diag < 12) return;
-    const x0 = P[0], y0 = P[1], xe = P[P.length - 3], ye = P[P.length - 2], p = ps / n;
-    const closed = Math.hypot(xe - x0, ye - y0) < Math.max(14, diag * 0.25) && len > diag * 1.7;
-    if (closed) {
-      const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
-      let rx = (maxx - minx) / 2, ry = (maxy - miny) / 2;
-      if (Math.abs(rx - ry) < 0.14 * Math.max(rx, ry)) rx = ry = (rx + ry) / 2;
-      a.snapped = { kind: 'ellipse', cx, cy, rx, ry, ref: Math.max(1, Math.hypot(xe - cx, ye - cy)), p };
-    } else a.snapped = { kind: 'line', x0, y0, p };
+    const res = recognize(a.pts, 30 / this.app.view.s);
+    if (!res) return; // nothing clean to snap to: the stroke stays as drawn
+    const P = a.pts, xe = P[P.length - 3], ye = P[P.length - 2];
+    let ps = 0;
+    for (let i = 2; i < P.length; i += 3) ps += P[i];
+    const p = ps / (P.length / 3);
+    if (res.kind === 'line') a.snapped = { kind: 'line', x0: res.pts[0][0], y0: res.pts[0][1], p };
+    else a.snapped = { kind: res.kind, base: res.pts, closed: res.closed, cx: res.cx, cy: res.cy, ref: res.closed ? Math.max(1, Math.hypot(xe - res.cx, ye - res.cy)) : 1, p };
     this.applySnap(a, xe, ye);
-    this.app.flashSnap(a.snapped.kind);
+    this.app.flashSnap(res.kind);
   }
+  /** after snapping, keep holding and drag: a line's end follows, a closed shape grows or shrinks around its centre */
   applySnap(a, x, y) {
     const s = a.snapped;
     let pts;
     if (s.kind === 'line') pts = [s.x0, s.y0, s.p, x, y, s.p];
-    else { const k = Math.hypot(x - s.cx, y - s.cy) / s.ref; pts = ellipsePts(s.cx, s.cy, s.rx * k, s.ry * k, s.p); }
+    else {
+      const k = s.closed ? Math.hypot(x - s.cx, y - s.cy) / s.ref : 1;
+      pts = [];
+      for (const [px, py] of s.base) pts.push(s.closed ? s.cx + (px - s.cx) * k : px, s.closed ? s.cy + (py - s.cy) * k : py, s.p);
+    }
     a.op.ln = 1;
     a.pts = pts.map((v, i) => (i % 3 === 2 ? q2(v) : q1(v)));
     this.app.liveReplace(a);

@@ -72,9 +72,51 @@ async function run(engine, touch) {
   await b.close();
 }
 
+// hold at the end of a hand-drawn stroke: it snaps to the shape it looks like (not always a circle)
+async function snaps(engine) {
+  console.log(`\n== hold-to-snap: ${engine.name()}`);
+  const b = await engine.launch();
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 860 }, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => localStorage.setItem('dd.profile', JSON.stringify({ id: 'snap0001', name: 'Sam', color: '#3d9bff' })));
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => { console.log('  [page error]', e.message); failures++; });
+  await page.goto('http://localhost:8396/');
+  await page.waitForFunction(() => window.app && window.app.doc);
+  const wobble = (i) => Math.sin(i * 0.9) * 3 + Math.sin(i * 0.23) * 4;
+  const drawHold = async (docPts) => {
+    const scr = await page.evaluate((pp) => pp.map(([x, y]) => window.app.view.toScreen(x, y)), docPts);
+    await page.mouse.move(scr[0][0], scr[0][1]); await page.mouse.down();
+    for (let i = 1; i < scr.length; i++) await page.mouse.move(scr[i][0], scr[i][1]);
+    await sleep(900); await page.mouse.up(); await sleep(150);
+    return page.evaluate(() => { const o = [...window.app.doc.ops.values()].sort((a, b) => a.k - b.k).pop(); const pts = []; for (let i = 0; i < o.p.length; i += 3) pts.push([o.p[i], o.p[i + 1]]); return { ln: o.ln, pts }; });
+  };
+  const edge = (a, b, n, off) => Array.from({ length: n }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / n + wobble(i + off), a[1] + ((b[1] - a[1]) * i) / n + wobble(i + off + 5)]);
+  // a rough square, started part-way along the top edge
+  const sq = [[500, 300], [1100, 300], [1100, 900], [500, 900]];
+  let pts = [...edge([700, 300], sq[1], 14, 0), ...edge(sq[1], sq[2], 20, 3), ...edge(sq[2], sq[3], 20, 7), ...edge(sq[3], sq[0], 20, 11), ...edge(sq[0], [730, 300], 8, 2)];
+  let r = await drawHold(pts);
+  const right = (p) => { if (p.length !== 5) return false; for (let i = 0; i < 4; i++) { const a = p[i], b = p[(i + 1) % 4], c = p[(i + 2) % 4]; const dot = (b[0] - a[0]) * (c[0] - b[0]) + (b[1] - a[1]) * (c[1] - b[1]); if (Math.abs(dot) > 50) return false; } return true; };
+  ok(r.ln === 1 && right(r.pts), `a rough square snaps to a clean square (${r.pts.length - 1} corners)`);
+  pts = [...edge([800, 250], [1150, 850], 22, 0), ...edge([1150, 850], [450, 850], 22, 4), ...edge([450, 850], [800, 250], 22, 9), [810, 270]];
+  r = await drawHold(pts);
+  ok(r.ln === 1 && r.pts.length === 4, `a rough triangle snaps to a triangle (${r.pts.length - 1} corners)`);
+  pts = Array.from({ length: 50 }, (_, i) => { const t = (i / 48) * Math.PI * 2; return [800 + Math.cos(t) * (300 + wobble(i)), 800 + Math.sin(t) * (300 + wobble(i + 4))]; });
+  r = await drawHold(pts);
+  const radii = r.pts.map(([x, y]) => Math.hypot(x - 800, y - 800));
+  ok(r.ln === 1 && r.pts.length > 24 && Math.max(...radii) - Math.min(...radii) < 12, 'a rough circle snaps to a round circle');
+  pts = edge([300, 1200], [1300, 1250], 30, 0);
+  r = await drawHold(pts);
+  ok(r.ln === 1 && r.pts.length === 2, 'a wobbly line snaps straight');
+  pts = Array.from({ length: 50 }, (_, i) => [300 + i * 20, 1400 + Math.sin(i * 0.7) * 60 + i * 2]);
+  r = await drawHold(pts);
+  ok(!r.ln, 'a squiggle stays as drawn');
+  await b.close();
+}
+
 try {
   await sleep(400);
   for (const eng of [chromium, webkit]) for (const touch of [false, true]) await run(eng, touch);
+  for (const eng of [chromium, webkit]) await snaps(eng);
 } catch (e) { console.log('  ✗ crashed:', e.message); failures++; }
 server.kill();
 console.log(failures ? `\n${failures} problem(s)` : '\nall good');

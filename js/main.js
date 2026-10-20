@@ -17,6 +17,7 @@ import { colorPanel } from './ui/color.js';
 import { brushPanel, shapePanel, fillPanel, layersPanel, modesSheet, inviteSheet, gallerySheet, newDocSheet, settingsSheet, helpSheet, textEditor, PLAYER_COLORS } from './ui/panels.js';
 import { Ideas } from './ui/rails.js';
 import { openReplay } from './replay.js';
+import { SNAP_LABEL } from './shapes.js';
 
 const DEFAULTS = {
   brush: 'pen', eraser: 'eraser', color: '#2f2940', recent: ['#2f2940', '#ff5fa2', '#3d8bff', '#ffd84d'], bs: {},
@@ -540,7 +541,11 @@ class App {
     if (!fromSlider) this.refreshSliders();
     this.saveSettingsSoon();
   }
-  chooseBrush(id, eraser) { this.settings[eraser ? 'eraser' : 'brush'] = id; this.saveSettings(); this.setTool(eraser ? 'eraser' : 'brush'); }
+  chooseBrush(id, eraser) {
+    this.settings[eraser ? 'eraser' : 'brush'] = id;
+    if (!eraser) this.settings.recentBrushes = [id, ...(this.settings.recentBrushes || []).filter((x) => x !== id)].slice(0, 8);
+    this.saveSettings(); this.setTool(eraser ? 'eraser' : 'brush');
+  }
   setTool(t) {
     if (t !== this.tool && ['brush', 'eraser', 'shape', 'fill', 'text'].includes(this.tool)) this.prevTool = this.tool;
     this.tool = t;
@@ -628,7 +633,7 @@ class App {
     if (drawing && (this.tool === 'brush' || this.tool === 'eraser')) return; // stroke points already show where you are
     this.send({ t: 'cur', d: this.doc.id, x: q1(x), y: q1(y), dr: drawing ? 1 : 0, z: this.bsOf(this.curBrushId()).z, tool: this.tool, l: this.layerId });
   }
-  flashSnap(kind) { toast(kind === 'line' ? '📏 Straight line' : '⭕ Neat circle', 900); }
+  flashSnap(kind) { toast(SNAP_LABEL[kind] || 'Snapped', 1000); }
 
   // ================================================================ trace pictures, cards, photos
   refImage(src, cb) {

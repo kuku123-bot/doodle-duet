@@ -126,13 +126,13 @@ try {
   ok((await pixelsDiff(A.page, B.page)) < TOL, 'both pictures are the same pixels');
 
   // ---- brushes: every brush on Bob, compare
-  const brushes = await B.page.evaluate(() => window.app.constructor && ['pencil', 'marker', 'brush', 'water', 'crayon', 'callig', 'air', 'spray', 'high', 'neon']);
+  const brushes = await B.page.evaluate(() => window.app.constructor && ['pencil', 'marker', 'brush', 'water', 'crayon', 'callig', 'air', 'spray', 'high', 'neon', 'oil', 'flat', 'charcoal', 'dash', 'rainbow', 'hearts', 'flowers', 'grass', 'glitter', 'confetti', 'splatter']);
   let y = 150;
   for (const b of brushes) {
     await B.page.evaluate((id) => window.app.chooseBrush(id, false), b);
     await B.page.evaluate((c) => window.app.setColor(c, true), ['#e5484d', '#3d8bff', '#22b88f', '#ffb020', '#7a5ac8'][y % 5]);
     await draw(B.page, [[150, y], [500, y + 60], [800, y]], 6);
-    y += 130;
+    y += 70;
   }
   if (process.env.DEBUGRELAY) for (let t = 0; t < 30; t++) {
     const st = await A.page.evaluate(() => { const c = window.app.net.conn, s = c && c.stream; return { n: window.app.doc.opCount, live: window.app.live.size, rx: s && s.rxSeq, hold: s && s.hold.size, state: window.app.net.state }; });

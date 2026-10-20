@@ -7,9 +7,13 @@ other, play drawing games and learn to draw together. No accounts, no server of 
 
 - **Live together**: every stroke streams to your partner while you draw it (direct WebRTC link, a few ms on the same
   Wi-Fi). You see your partner's pointer, laser pointer (Point tool) and reactions.
-- **Pro tools, simple UI**: 11 brushes (ink pen, pencil, marker, soft brush, watercolor, crayon, calligraphy, airbrush,
-  spray, highlighter, neon) + 2 erasers, Apple Pencil pressure, smoothing, symmetry, fill bucket, shapes (line, arrow,
-  box, circle, triangle, star, heart, filled or not), hold-at-the-end-of-a-stroke to snap a straight line or circle,
+- **Pro tools, simple UI**: 45 brushes in 6 groups: Sketch (pencils, colored pencil, charcoal, liner), Ink (pens,
+  fineliner, technical, brush pen, dry ink, marker, felt tip, dashed, dotted), Paint (soft, round, oil, flat, gouache,
+  watercolor, wet wash, airbrush, sponge), Art (crayon, oil pastel, chalk, calligraphy, ribbon, chisel, highlighter,
+  spray, splatter, grass & fur), Fun (neon, glow, rainbow, glitter, hearts, stars, sparkles, bubbles, flowers, leaves,
+  confetti) and 4 erasers. Apple Pencil pressure, smoothing, symmetry, fill bucket, shapes (line, arrow, box, circle,
+  triangle, star, heart, filled or not), hold at the end of a stroke to snap it into the shape it looks like (line, arc,
+  straight segments, triangle, rectangle, square, polygon, circle, ellipse),
   text, colour picker + palette + eyedropper, layers (opacity, order, hide, rename), paper colours, grid / thirds / face
   guides, zoom / pan / rotate, undo / redo for each person, export PNG, gallery, time-lapse video.
 - **Modes**: Free draw · Split canvas (drag the divider anywhere, overlap margin, “stay on my side” or draw anywhere,
@@ -43,7 +47,7 @@ fingers only move the canvas (palm rejection); two fingers pinch / rotate, a two
 ```
 npm install          # only Playwright, for the tests
 npm run serve        # http://localhost:8377
-npm test             # relay repair unit test + touch/pen test + two-browser test (Chromium ↔ WebKit)
+npm test             # shapes + relay unit tests, touch/pen, real-button UI tests, two-browser sync (Chromium ↔ WebKit)
 npm run test:relay   # the two-browser test forced through the encrypted relay
 ```
 

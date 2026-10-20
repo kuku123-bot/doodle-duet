@@ -246,6 +246,7 @@ details[open] > summary::before { content: '▾ '; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs button { height: 34px; padding: 0 12px; border-radius: 11px; font-weight: 800; font-size: 13px; background: var(--sunk); white-space: nowrap; }
 .tabs button.on { background: var(--accent); color: var(--accent-ink); }
+#pop .tabs { flex-wrap: wrap; overflow: visible; }
 #cards { position: fixed; inset: 0; pointer-events: none; z-index: 25; }
 .refcard { position: absolute; pointer-events: auto; width: 260px; background: var(--solid); border-radius: 18px; box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; display: flex; flex-direction: column; animation: pop .18s ease-out; }
 .refcard .rh { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; cursor: grab; touch-action: none; font-weight: 800; font-size: 13px; }

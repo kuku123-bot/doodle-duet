@@ -1,7 +1,8 @@
 // Popovers and sheets: brushes, shapes, fill, layers, modes, invite, gallery, new drawing, settings, help.
 import { h, makeCanvas } from '../util.js';
 import { icon } from '../icons.js';
-import { BRUSHES, brushOf, StrokeRenderer, bbRect, compositeStroke } from '../brushes.js';
+import { BRUSHES, BRUSH_CATS, brushOf, StrokeRenderer, bbRect, compositeStroke } from '../brushes.js';
+import { prefs } from '../store.js';
 import { FONTS, MAX_LAYERS } from '../doc.js';
 import { MODE_LIST, SYMS } from '../modes.js';
 import { slider, sliderRow, toggle, seg, sheetHead, confirmSheet, openSheet } from './widgets.js';
@@ -17,7 +18,7 @@ export function brushPreview(id, color, w = 150, hgt = 40) {
     const t = i / 40;
     pts.push((10 + t * (w - 20)) * dpr, (hgt / 2 + Math.sin(t * Math.PI * 2) * hgt * 0.22) * dpr, Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.9 + 0.1);
   }
-  const z = Math.min(B.def.z, B.kind === 'dab' || B.kind === 'spray' ? 22 : 12) * dpr;
+  const z = Math.min(B.def.z, ['cap', 'nib', 'dash', 'rainbow', 'neon'].includes(B.kind) ? 12 : 22) * dpr;
   if (B.erase) { x.fillStyle = '#c9c3d3'; x.fillRect(0, hgt * 0.25 * dpr, w * dpr, hgt * 0.5 * dpr); }
   const op = { b: id, c: B.erase ? '#000' : color, z, o: B.def.o, sd: 7, p: pts };
   const r = new StrokeRenderer(op, sx); r.add(pts); r.finish();
@@ -25,19 +26,35 @@ export function brushPreview(id, color, w = 150, hgt = 40) {
   return c;
 }
 
+const previewCache = new Map();
+function cachedPreview(id, color) {
+  const key = id + color;
+  let c = previewCache.get(key);
+  if (!c) { c = brushPreview(id, color); if (previewCache.size > 160) previewCache.delete(previewCache.keys().next().value); previewCache.set(key, c); }
+  const out = makeCanvas(c.width, c.height); out.getContext('2d').drawImage(c, 0, 0);
+  return out;
+}
+
 export function brushPanel(app, close, eraser) {
-  const list = BRUSHES.filter((b) => (eraser ? b.erase : !b.erase));
   const cur = eraser ? app.settings.eraser : app.settings.brush;
-  const grid = h('div', { class: 'brushes' }, list.map((b) => {
-    const card = h('button', { class: 'bcard' + (b.id === cur ? ' on' : ''), onclick: () => { app.chooseBrush(b.id, eraser); close(); } }, brushPreview(b.id, app.settings.color), h('div', { class: 'bn' }, b.name));
-    return card;
-  }));
+  const recent = (app.settings.recentBrushes || []).filter((id) => brushOf(id).id === id && !brushOf(id).erase);
+  const cats = eraser ? ['Erase'] : [...(recent.length ? ['Recent'] : []), ...BRUSH_CATS.filter((c) => c !== 'Erase')];
+  let tab = eraser ? 'Erase' : prefs.get('brushTab', brushOf(cur).cat || 'Ink');
+  if (!cats.includes(tab)) tab = cats[0];
+  const grid = h('div', { class: 'brushes' }), tabs = h('div', { class: 'tabs', style: 'margin-bottom:10px' });
+  const card = (b) => h('button', { class: 'bcard' + (b.id === cur ? ' on' : ''), title: b.name, onclick: () => { app.chooseBrush(b.id, eraser); close(); } }, cachedPreview(b.id, app.settings.color), h('div', { class: 'bn' }, b.name));
+  const render = () => {
+    tabs.replaceChildren(...cats.map((c) => h('button', { class: c === tab ? 'on' : '', onclick: () => { tab = c; if (c !== 'Recent') prefs.set('brushTab', c); render(); } }, c)));
+    const list = tab === 'Recent' ? recent.map(brushOf) : BRUSHES.filter((b) => b.cat === tab);
+    grid.replaceChildren(...list.map(card));
+  };
+  render();
   const bs = app.bsOf(cur);
   const B = brushOf(cur);
   const size = sliderRow('Size', { min: 1, max: B.max, log: true, value: bs.z, fmt: (v) => Math.round(v) + ' px', onInput: (v) => app.setBrushProp('z', v) });
   const op = sliderRow('Opacity', { min: 0.02, max: 1, value: bs.o, fmt: (v) => Math.round(v * 100) + '%', onInput: (v) => app.setBrushProp('o', v) });
   const sm = sliderRow('Smoothing', { min: 0, max: 1, value: app.smoothingFor(cur), fmt: (v) => Math.round(v * 100) + '%', onInput: (v) => app.setBrushProp('sm', v) });
-  const out = [h('div', { class: 'pop-h' }, h('h3', {}, eraser ? 'Erasers' : 'Brushes'), h('span', { class: 'small' }, B.name)), grid, h('div', { class: 'sec-t' }, 'Settings'), size.el, op.el, sm.el];
+  const out = [h('div', { class: 'pop-h' }, h('h3', {}, eraser ? 'Erasers' : 'Brushes'), h('span', { class: 'small' }, B.name + (B.blend === 'lighter' ? ' · glows on dark paper' : ''))), eraser ? null : tabs, grid, h('div', { class: 'sec-t' }, 'Settings'), size.el, op.el, sm.el];
   if (!eraser) {
     out.push(h('div', { class: 'sec-t' }, 'Symmetry (just for you)'), seg([[null, 'Off'], ['v', '⇆'], ['h', '⇅'], ['q', '✛'], ['k6', '❄︎']], app.settings.sym || null, (v) => { app.settings.sym = v; app.saveSettings(); app.view.request(); }));
     out.push(toggle('Hold to snap shapes', app.settings.quickShape, (v) => { app.settings.quickShape = v; app.saveSettings(); }, 'Hold still at the end of a line: it straightens, a loop becomes a circle'));
