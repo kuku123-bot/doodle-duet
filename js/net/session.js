@@ -9,14 +9,14 @@ export const PROTOCOL = 1;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // testing aid: skip the direct link and use the relay (only on this computer)
 const forceRelay = () => { try { return localStorage.getItem('dd.forcerelay') === '1' && ['localhost', '127.0.0.1'].includes(location.hostname); } catch (e) { return false; } };
-const CHUNK_DIRECT = 16000, CHUNK_RELAY = 48000;
+const CHUNK_DIRECT = 16000, CHUNK_RELAY = 48000, BATCH_MS = 100;
 
 export class Session {
   /** h: { me() -> {id,name,color}, onPartner(partner), onLeave(partner), onMessage(msg), onState(session), onMismatch(v) } */
   constructor(h) {
     this.h = h; this.gen = 0; this.room = null; this.peer = null; this.relay = null; this.conn = null; this.partner = null;
     this.role = null; this.rtt = 0; this.state = 'off'; this.text = ''; this.lastRx = 0;
-    this.out = []; this.pumping = false; this.chunks = new Map(); this.ckId = 0; this.lastChunkAt = 0;
+    this.out = []; this.pumping = false; this.chunks = new Map(); this.ckId = 0; this.lastChunkAt = 0; this.batch = []; this.batchT = null;
     setInterval(() => this._tick(), 2000);
   }
   get connected() { return !!(this.conn && this.conn.open && this.partner); }
@@ -138,7 +138,7 @@ export class Session {
     conn.onclose = () => { if (this.conn === conn) this._drop(conn); if (onClose) onClose(); };
   }
   _adopt(conn, hello) {
-    this.conn = conn; this.lastRx = Date.now(); this.out = []; this.chunks.clear();
+    this.conn = conn; this.lastRx = Date.now(); this.out = []; this.batch = []; this.chunks.clear();
     this.partner = { id: String(hello.id || ''), name: String(hello.name || 'Partner').slice(0, 24), color: String(hello.color || '#4ea1ff') };
     if (hello.v !== PROTOCOL && this.h.onMismatch) this.h.onMismatch(hello.v);
     this._set('connected', this.via === 'relay' ? 'Connected through the backup relay' : 'Connected directly');
@@ -147,7 +147,7 @@ export class Session {
   _drop(conn) {
     if (this.conn !== conn) return;
     const p = this.partner;
-    this.conn = null; this.partner = null; this.out = []; this.chunks.clear();
+    this.conn = null; this.partner = null; this.out = []; this.batch = []; this.chunks.clear();
     if (this.role === 'host') this._set('waiting', 'Waiting for your partner…');
     else this._set('connecting', 'Reconnecting…');
     if (p && this.h.onLeave) this.h.onLeave(p);
@@ -156,8 +156,12 @@ export class Session {
   _rx(conn, s, onHello) {
     let m;
     try { m = JSON.parse(s); } catch (e) { return; }
+    this._handle(conn, m, onHello);
+  }
+  _handle(conn, m, onHello) {
     if (!m || typeof m.t !== 'string') return;
     if (conn === this.conn) this.lastRx = Date.now();
+    if (m.t === '_b') { if (Array.isArray(m.m)) for (const x of m.m) this._handle(conn, x, onHello); return; }
     if (m.t === '_ck') {
       if (conn !== this.conn) return;
       let c = this.chunks.get(m.id);
@@ -189,6 +193,24 @@ export class Session {
   send(obj) {
     if (!this.connected) return false;
     const s = JSON.stringify(obj);
+    // relay: public brokers drop messages when they come thick and fast, so small ones travel together, 10 bundles a second
+    if (this.lowRate && s.length < 8000) {
+      this.batch.push(s);
+      if (!this.batchT) this.batchT = setTimeout(() => this._flushBatch(), BATCH_MS);
+      return true;
+    }
+    this._flushBatch(); // keep the order: anything batched goes out before this bigger message
+    this._enqueue(s);
+    return true;
+  }
+  _flushBatch() {
+    clearTimeout(this.batchT); this.batchT = null;
+    if (!this.batch.length) return;
+    const s = this.batch.length === 1 ? this.batch[0] : '{"t":"_b","m":[' + this.batch.join(',') + ']}';
+    this.batch = [];
+    if (this.connected) this._enqueue(s);
+  }
+  _enqueue(s) {
     const max = this.lowRate ? CHUNK_RELAY : CHUNK_DIRECT;
     if (s.length <= max) this.out.push({ s, ck: false });
     else {
@@ -196,7 +218,6 @@ export class Session {
       for (let i = 0; i < n; i++) this.out.push({ s: JSON.stringify({ t: '_ck', id, i, n, d: s.slice(i * max, (i + 1) * max) }), ck: true });
     }
     this._pump();
-    return true;
   }
   _pump() {
     if (this.pumping) return;

@@ -433,7 +433,7 @@ class App {
       if (q) q.push(...a.pend); else this.outPts.set(a.op.id, a.pend.slice());
       if (!this.ptsQueued) {
         this.ptsQueued = true;
-        if (this.net.lowRate) setTimeout(() => this.flushPts(), 80); else queueMicrotask(() => this.flushPts());
+        if (this.net.lowRate) setTimeout(() => this.flushPts(), 95); else queueMicrotask(() => this.flushPts());
       }
     }
     a.pend = [];

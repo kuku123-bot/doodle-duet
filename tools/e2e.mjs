@@ -133,6 +133,13 @@ try {
     await draw(B.page, [[150, y], [500, y + 60], [800, y]], 6);
     y += 130;
   }
+  if (process.env.DEBUGRELAY) for (let t = 0; t < 30; t++) {
+    const st = await A.page.evaluate(() => { const c = window.app.net.conn, s = c && c.stream; return { n: window.app.doc.opCount, live: window.app.live.size, rx: s && s.rxSeq, hold: s && s.hold.size, state: window.app.net.state }; });
+    const sb = await B.page.evaluate(() => { const c = window.app.net.conn, s = c && c.stream; return { n: window.app.doc.opCount, tx: s && s.txSeq, out: window.app.net.out.length }; });
+    console.log('   ', t, JSON.stringify(st), JSON.stringify(sb));
+    if (st.n === 3 + brushes.length) break;
+    await sleep(700);
+  }
   await waitFor(A.page, (n) => window.app.doc.opCount === n, 3 + brushes.length, 8000, 'brushes arrive');
   ok((await pixelsDiff(A.page, B.page)) < TOL, `${brushes.length} different brushes look the same on both`);
 
