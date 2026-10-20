@@ -8,9 +8,10 @@ import { writeFileSync } from 'node:fs';
 const ENG = { chromium, webkit };
 const [ea = 'chromium', eb = 'chromium'] = process.argv.slice(2);
 const TOL = ea === eb ? 0.004 : 0.02; // Safari and Chrome anti-alias edges a little differently
-const PORT = 8391, URL0 = `http://localhost:${PORT}/`;
+// SITE=https://… tests a deployed copy instead of the local files
+const PORT = 8391, URL0 = process.env.SITE || `http://localhost:${PORT}/`;
 const root = fileURLToPath(new URL('..', import.meta.url));
-const server = spawn(process.execPath, ['tools/serve.mjs', String(PORT)], { cwd: root, stdio: 'ignore' });
+const server = process.env.SITE ? { kill() {} } : spawn(process.execPath, ['tools/serve.mjs', String(PORT)], { cwd: root, stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failures = 0;
 const ok = (cond, msg) => { console.log((cond ? '  ✓ ' : '  ✗ ') + msg); if (!cond) failures++; };
