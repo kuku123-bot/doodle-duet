@@ -9,7 +9,7 @@ import { prefs } from '../store.js';
 export class Ideas {
   constructor(app) {
     this.app = app; this.cardsEl = h('div', { id: 'cards' }); document.body.append(this.cardsEl);
-    this.cards = new Map(); this.n = 0;
+    this.cards = new Map(); this.n = 0; this.z = 1;
     this.fileIn = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: (e) => { this.addPhotos([...e.target.files]); e.target.value = ''; } });
     document.body.append(this.fileIn);
     this.rails = [this._rail('left', prefs.get('railL', 'Animals')), this._rail('right', prefs.get('railR', 'Love'))];
@@ -72,7 +72,7 @@ export class Ideas {
   // ---------------------------------------------------------------- floating cards
   openCard(src, { from } = {}) {
     const ex = this.cards.get(src);
-    if (ex) { this.cardsEl.append(ex.el); ex.el.animate([{ transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 200 }); return; }
+    if (ex) { this.front(ex.el); ex.el.animate([{ transform: 'scale(1.04)' }, { transform: 'scale(1)' }], { duration: 200 }); return; }
     const app = this.app, small = innerWidth < 600;
     let w = small ? 190 : 260;
     const imgBox = h('div', { class: 'rimg' });
@@ -103,14 +103,16 @@ export class Ideas {
     };
     const close = () => { el.remove(); this.cards.delete(src); };
     card.close = close;
-    dragHandle(head, (dx, dy) => { x += dx; y += dy; size(); }, () => this.cardsEl.append(el));
+    dragHandle(head, (dx, dy) => { x += dx; y += dy; size(); }, () => this.front(el));
     dragHandle(grip, (dx) => { w += dx; size(); });
-    el.addEventListener('pointerdown', () => this.cardsEl.append(el));
+    // bring to front with z-index: moving the element in the page during a press would swallow the button's click
+    el.addEventListener('pointerdown', () => this.front(el));
     if (im) setImg(im); else size();
-    this.cardsEl.append(el);
+    this.cardsEl.append(el); this.front(el);
     this.cards.set(src, card);
     return card;
   }
+  front(el) { el.style.zIndex = String(++this.z); }
   traceMenu(anchor, src) {
     const app = this.app;
     openPop(anchor, (close) => {
